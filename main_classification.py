@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from astropy.table import Table
 from sklearn.metrics import roc_curve
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from astroML.utils import completeness_contamination
@@ -14,6 +15,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis as QDA
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 
@@ -51,12 +53,16 @@ class_integer_container_for_analysis = np.array(class_container == "QSO", dtype=
 # print(class_container)
 # print(class_integer_container_for_analysis)
 
+def clean_importation() -> None:
+
+    return color_container_for_analysis, class_integer_container_for_analysis
+
 
 X_train, X_test, y_train, y_test = train_test_split(color_container_for_analysis, class_integer_container_for_analysis, test_size = 0.25, random_state= 42 )
 # print(X_train.shape)
 
 
-def classifiers(data, labels, classifier_name) -> None:
+def classifiers(data, labels, classifier_name, criterion = "gini") -> None:
 
     X_train, X_test = data[0], data[-1]
     y_train, y_test = labels[0], labels[-1]
@@ -71,6 +77,20 @@ def classifiers(data, labels, classifier_name) -> None:
 
             classifier_model = classifier_name(i+2)
 
+        elif classifier_name ==  DecisionTreeClassifier:
+            
+            classifier_model = classifier_name(random_state=42)
+            max_depth_container = np.arange(1, 21)
+
+            grid_search = GridSearchCV(classifier_model, param_grid={"max_depth": max_depth_container}, cv=5, n_jobs=-1)
+            grid_search.fit(X_train, y_train)
+
+            max_depth = grid_search.best_params_["max_depth"]  # if you want to optimize the speed of your code here, make this a metod in an object and store this max_depth iin a self.max_depth variable/container. That way, you'll avoid running GridSearchCv every single time !!!
+
+            classifier_model = classifier_name(max_depth=max_depth, criterion=criterion, random_state=42)
+
+            print(f' The {i+1}-th max_depth is {max_depth}')
+
         else: 
             classifier_model = classifier_name()
 
@@ -78,10 +98,10 @@ def classifiers(data, labels, classifier_name) -> None:
         classifier_model.fit(X_train[:, 0:i+1], y_train)
 
         # training prediction
-        training_prediction = classifier_model.predict(X_train[:, 0:i+1])
+        # training_prediction = classifier_model.predict(X_train[:, 0:i+1]) No need for training predicitions here as well since we're not doing any cross validation
 
         # validation predicton
-        validation_prediction = classifier_model.predict(X_test[:, 0:i+1])
+        # validation_prediction = classifier_model.predict(X_test[:, 0:i+1]) No, need for validation here! We could do that solely for the ensemble classifiers
         
         y_prob = classifier_model.predict_proba(X_test[:, 0:i+1])[:, 1]  # this extracts the probability for tyhe Quasars!! Observed this from first printing out the results before writing this particular line of code!!
 
@@ -116,4 +136,8 @@ if __name__ == "__main__":
     classifiers(data, labels, KNeighborsClassifier)
     classifiers(data, labels, LDA)
     classifiers(data, labels, QDA)
+    classifiers(data, labels, DecisionTreeClassifier)
+    classifiers(data, labels, DecisionTreeClassifier, criterion="entropy")
     
+
+    # find a way to efficiently implement the RandomForestClassifier(DecisionTreeClassifier did quite a great job though).
