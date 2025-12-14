@@ -1,14 +1,12 @@
+from preprocessing import processed_data
+
 import numpy as np
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 from astropy.table import Table
 from sklearn.metrics import roc_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from astroML.utils import completeness_contamination
-from sklearn.metrics import precision_recall_curve
+# from sklearn.preprocessing import StandardScaler
 from sklearn.naive_bayes import GaussianNB
 from astroML.classification import GMMBayes
 from sklearn.neighbors import KNeighborsClassifier
@@ -16,53 +14,17 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis as QDA
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
 
-file_path: str = "galaxyquasar.csv"
-
-try:
-    file_container: list[float, ...] = Table.read(file_path, format="ascii")
-except Exception as except_one:
-    print(f' {type(except_one).__name__} occured!')
-
-    file_container: list[float, ...] = Table.read(file_path, format="csv")
-
-# print(file_container.columns)
-# print(file_container)
-
-# data_to_visualize: pd.DataFrame = file_container.to_pandas()
-# print(data_to_visualize)
-# sns.pairplot(data_to_visualize)
-# plt.show()
-
-u_color, g_color, r_color, i_color, z_color = file_container["u"], file_container["g"], file_container["r"], file_container["i"], file_container["z"]
-class_container = np.array(file_container["class"])
-
-u_g_color_container = np.array(u_color - g_color)
-g_r_color_container = np.array(g_color - r_color)
-r_i_color_container = np.array(r_color - i_color)
-i_z_color_container = np.array(i_color - z_color)
-
-color_container_for_analysis = np.vstack([u_g_color_container,g_r_color_container, r_i_color_container, i_z_color_container]).T
-scaler = StandardScaler()
-scaler.fit_transform(color_container_for_analysis) # actualy this makes no difference here, so we can safely proceed without any worries about getting some very weird results
-# print(color_containr_for_analysis)
-
-class_integer_container_for_analysis = np.array(class_container == "QSO", dtype=int)
-# print(class_container)
-# print(class_integer_container_for_analysis)
-
-def clean_importation() -> None:
-
-    return color_container_for_analysis, class_integer_container_for_analysis
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report
 
 
-X_train, X_test, y_train, y_test = train_test_split(color_container_for_analysis, class_integer_container_for_analysis, test_size = 0.25, random_state= 42 )
+X, y, star_data, quasar_data = processed_data() # I can easily delete this and still have a fully functioning code, by the way, because I have already loaded the X and y.
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = 0.65, random_state= 42, stratify=y)
 # print(X_train.shape)
 
 
-def classifiers(data, labels, classifier_name, criterion = "gini") -> None:
+def classifiers_roc_curve(data, labels, classifier_name, criterion = "gini") -> None:
 
     X_train, X_test = data[0], data[-1]
     y_train, y_test = labels[0], labels[-1]
@@ -77,21 +39,24 @@ def classifiers(data, labels, classifier_name, criterion = "gini") -> None:
 
             classifier_model = classifier_name(i+2)
 
-        elif classifier_name ==  DecisionTreeClassifier:
-            
+        elif classifier_name ==  DecisionTreeClassifier or classifier_name ==  RandomForestClassifier:
+
             classifier_model = classifier_name(random_state=42)
             max_depth_container = np.arange(1, 21)
 
             grid_search = GridSearchCV(classifier_model, param_grid={"max_depth": max_depth_container}, cv=5, n_jobs=-1)
             grid_search.fit(X_train, y_train)
 
-            max_depth = grid_search.best_params_["max_depth"]  # if you want to optimize the speed of your code here, make this a metod in an object and store this max_depth iin a self.max_depth variable/container. That way, you'll avoid running GridSearchCv every single time !!!
+            max_depth = grid_search.best_params_["max_depth"]  # if you want to optimize the speed of your code here, make this a method in an object and store this max_depth iin a self.max_depth variable/container. That way, you'll avoid running GridSearchCv every single time !!!
 
-            classifier_model = classifier_name(max_depth=max_depth, criterion=criterion, random_state=42)
+            if classifier_name ==  RandomForestClassifier:
+              classifier_model = classifier_name(max_depth = max_depth, criterion=criterion, random_state=42, n_jobs = -1) # I want to split the work among all my computers processors using n_jobs = -1
+            else:
+              classifier_model = classifier_name(max_depth=max_depth, criterion=criterion, random_state=42)
 
             print(f' The {i+1}-th max_depth is {max_depth}')
 
-        else: 
+        else:
             classifier_model = classifier_name()
 
 
@@ -102,7 +67,7 @@ def classifiers(data, labels, classifier_name, criterion = "gini") -> None:
 
         # validation predicton
         # validation_prediction = classifier_model.predict(X_test[:, 0:i+1]) No, need for validation here! We could do that solely for the ensemble classifiers
-        
+
         y_prob = classifier_model.predict_proba(X_test[:, 0:i+1])[:, 1]  # this extracts the probability for tyhe Quasars!! Observed this from first printing out the results before writing this particular line of code!!
 
         false_positive_rate, true_positive_rate, threshold = roc_curve(y_test, y_prob)
@@ -116,28 +81,48 @@ def classifiers(data, labels, classifier_name, criterion = "gini") -> None:
         ax_main.legend(loc="best")
 
     figure.tight_layout()
+    # figure.savefig(f"/content/drive/MyDrive/Colab Images/{classifier_name.__name__}_roc_curve.png") # I'll have to put this in my slide.
     plt.show()
 
-    # print(training_prediction)
-    # print(validation_prediction)
-    # print(y_prob.shape)
-    # print(y_prob)
-    # print(gaussian_naive_bayes_classifier.classes_)
 
-    
+def confusion_matrix_and_classification_report(model):
+    classifier_model = model
+
+    classifier_model.fit(X_train, y_train)
+
+    y_pred = classifier_model.predict(X_test)
+    # print(y_test.shape)
+    # print(y_pred.shape)
+
+    #now, we create the confusion matrix object
+    confusion_matrix_container =  confusion_matrix(y_test, y_pred)
+    class_names = ["star", "quasar"]
+    confusion_matrix_display = ConfusionMatrixDisplay(confusion_matrix=confusion_matrix_container, display_labels=class_names)
+    confusion_matrix_display.plot(cmap=plt.cm.Blues)
+    plt.title("Confusion Matrix")
+
+    # plt.savefig(f"/content/drive/MyDrive/Colab Images/{model_name.__name__}_confusion_matrix.png") # I'll have to put this in my slide.
+    plt.show()
+
+    classification_report_container = classification_report(y_test, y_pred)
+
+    return classification_report_container
+
+
 
 if __name__ == "__main__":
 
     data = [X_train, X_test]
     labels = [y_train, y_test]
 
-    classifiers(data, labels, GaussianNB)
-    classifiers(data, labels, GMMBayes)
-    classifiers(data, labels, KNeighborsClassifier)
-    classifiers(data, labels, LDA)
-    classifiers(data, labels, QDA)
-    classifiers(data, labels, DecisionTreeClassifier)
-    classifiers(data, labels, DecisionTreeClassifier, criterion="entropy")
-    
+    # for GaussianNB
+    classifiers_roc_curve(data, labels, GaussianNB) #makes roc curve
+    classification_report_container = confusion_matrix_and_classification_report( GaussianNB() )
+    print(classification_report_container)
 
-    # find a way to efficiently implement the RandomForestClassifier(DecisionTreeClassifier did quite a great job though).
+    # for GMMBayes
+    classifiers_roc_curve(data, labels, GMMBayes) #makes roc curve
+    classification_report_container = confusion_matrix_and_classification_report( GMMBayes() )
+    print(classification_report_container)
+
+

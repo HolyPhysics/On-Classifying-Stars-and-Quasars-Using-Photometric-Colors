@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from astroML.datasets import fetch_sdss_sspp
 
 try:
-    quasar_path = "dr7qso.fit"
+    quasar_path = "dr7qso.fit" # Alternatively, I can use "galaxyquasar.csv" and make the code tailored to it so it can actually work!
     quasar_container = Table.read(quasar_path)
     # print(quasar_container.columns)
 
