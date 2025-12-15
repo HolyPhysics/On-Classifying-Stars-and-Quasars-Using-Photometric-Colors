@@ -64,6 +64,8 @@ Tree-based models use GridSearchCV with cross-validation to determine the optima
 pip install numpy matplotlib astropy astroML scikit-learn
 ```
 
+---
+
 ## How to Run
 
 ### Step 1: Preprocessing
