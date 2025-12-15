@@ -24,12 +24,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = 0.65, ran
 # print(X_train.shape)
 
 
-def classifiers_roc_curve(data, labels, classifier_name, criterion = "gini") -> None:
+def classifiers_roc_curve(data, labels, classifier_name, criterion = "gini", max_depth = 12) -> None:
 
     X_train, X_test = data[0], data[-1]
     y_train, y_test = labels[0], labels[-1]
 
     color_container = ["green", "red", "blue", "orange"]
+    
+    learned_max_depth = []
 
     figure, ax_main = plt.subplots(figsize=(8.5, 7.5)) # should be left in place here for crucial line by line interpretation by python
 
@@ -48,6 +50,7 @@ def classifiers_roc_curve(data, labels, classifier_name, criterion = "gini") -> 
             grid_search.fit(X_train, y_train)
 
             max_depth = grid_search.best_params_["max_depth"]  # if you want to optimize the speed of your code here, make this a method in an object and store this max_depth iin a self.max_depth variable/container. That way, you'll avoid running GridSearchCv every single time !!!
+            learned_max_depth.append(max_depth)
 
             if classifier_name ==  RandomForestClassifier:
               classifier_model = classifier_name(max_depth = max_depth, criterion=criterion, random_state=42, n_jobs = -1) # I want to split the work among all my computers processors using n_jobs = -1
@@ -84,6 +87,8 @@ def classifiers_roc_curve(data, labels, classifier_name, criterion = "gini") -> 
     # figure.savefig(f"/content/drive/MyDrive/Colab Images/{classifier_name.__name__}_roc_curve.png") # I'll have to put this in my slide.
     plt.show()
 
+    return learned_max_depth
+
 
 def confusion_matrix_and_classification_report(model):
     classifier_model = model
@@ -118,11 +123,55 @@ if __name__ == "__main__":
     # for GaussianNB
     classifiers_roc_curve(data, labels, GaussianNB) #makes roc curve
     classification_report_container = confusion_matrix_and_classification_report( GaussianNB() )
-    print(classification_report_container)
+    print(f"Classification report for GaussianNB() is \n {classification_report_container}. " )
 
     # for GMMBayes
     classifiers_roc_curve(data, labels, GMMBayes) #makes roc curve
-    classification_report_container = confusion_matrix_and_classification_report( GMMBayes() )
-    print(classification_report_container)
+    classification_report_container = confusion_matrix_and_classification_report( GMMBayes(5) )
+    print(f"Classification report for GMMBayes(5) is \n {classification_report_container}. " )
+
+    # KNeighborsClassifier
+    classifiers_roc_curve(data, labels, KNeighborsClassifier) #makes roc curve
+    classification_report_container = confusion_matrix_and_classification_report( KNeighborsClassifier(5) )
+    print(f"Classification report for KNeighborsClassifier(5) is \n {classification_report_container}. " )
+
+    #  for LDA
+    classifiers_roc_curve(data, labels, LDA) #makes roc curve
+    classification_report_container = confusion_matrix_and_classification_report( LDA() )
+    print(f"Classification report for LDA() is \n {classification_report_container}. " )
+
+    # for QDA
+    classifiers_roc_curve(data, labels, QDA) #makes roc curve
+    classification_report_container = confusion_matrix_and_classification_report( QDA() )
+    print(f"Classification report for QDA() is \n {classification_report_container}. " )
+
+    # for DecisionTreeClassifier with criterion = "gini"
+    learned_max_depth = classifiers_roc_curve(data, labels, DecisionTreeClassifier, "gini") #makes roc curve
+    max_depth =  max( learned_max_depth ) # This code grabs the max_depth(which is a default_value) programmatically. The max_depth is the second default item in the function definition. Should be read from the printed depth from Gridserach CV printed above 
+
+    classification_report_container = confusion_matrix_and_classification_report( DecisionTreeClassifier(max_depth=max_depth, criterion="gini", random_state=42) )
+    print(f"Classification report for DecisionTreeClassifier(gini, max_depth={max_depth} ) is \n {classification_report_container}. " )
+
+    # for RandomForestClassifier with criterion = "entropy"
+    learned_max_depth = classifiers_roc_curve(data, labels, DecisionTreeClassifier, "entropy" ) #makes roc curve
+    max_depth = max( learned_max_depth )  # Should be read from the printed depth from Gridserach CV printed above 
+
+    classification_report_container = confusion_matrix_and_classification_report( DecisionTreeClassifier(max_depth=max_depth, criterion="entropy", random_state=42) )
+    print(f"Classification report for DecisionTreeClassifier(entropy, max_depth={max_depth} ) is \n {classification_report_container}. " )
 
 
+    # for RandomForestClassifier with criterion = "gini"
+    learned_max_depth = classifiers_roc_curve(data, labels, RandomForestClassifier, "gini") #makes roc curve
+
+    max_depth = max( learned_max_depth )  # Should be read from the printed depth from Gridserach CV printed above 
+
+    classification_report_container = confusion_matrix_and_classification_report( RandomForestClassifier(max_depth=max_depth, criterion="gini", random_state=42, n_jobs=-1) )
+    print(f"Classification report for RandomForestClassifier(gini, max_depth={max_depth} ) is \n {classification_report_container}. " )
+
+    # for RandomForestClassifier with criterion = "entropy"
+    learned_max_depth = classifiers_roc_curve(data, labels, RandomForestClassifier, "entropy") #makes roc curve
+
+    max_depth = max( learned_max_depth )  # Should be read from the printed depth from Gridserach CV printed above 
+
+    classification_report_container = confusion_matrix_and_classification_report( RandomForestClassifier(max_depth=max_depth, criterion="entropy", random_state=42, n_jobs=-1) )
+    print(f"Classification report for RandomForestClassifier(entropy, max_depth={max_depth} ) is \n {classification_report_container}. " )
